@@ -1,0 +1,129 @@
+﻿@page "/"
+@page "/expenses"
+@using kfh_expense_app.Services
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IExpenseService ExpenseService
+@inject AuthSessionService Auth
+@inject NavigationManager NavigationManager
+<h3>Expenses</h3>
+
+@if (!Auth.IsAuthenticated)
+{
+    <p>Redirecting</p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Expenses</h4>
+        <div class="d-flex gap-2">
+            <a class="btn btn-success btn-sm" href="/expense/create">Add Expense</a>
+            @if(Auth.IsApprover){
+                <a class="btn btn-warning btn-sm" href="/expense/actions">Actions</a>
+            }
+        </div>
+    </div>
+    <div class="row mb-3">
+
+        <div class="col-md-3">
+            <select class="form-select form-select-sm" @bind="statusFilter" @bind:after="Reload">
+                <option value="">All</option>
+                <option value="Pending">Pending</option>
+                <option value="Approve">Approve</option>
+                <option value="Rejected">Rejected</option>
+            </select>
+
+        </div>
+    </div>
+
+    @if(expenses is null)
+    {
+        <p class="text-muted">Loading...</p>
+    }
+    else
+    {
+        <table class="table table-striped table-hover table-sm align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Title</th>
+                    <th>Amount</th>
+                    <th>Currency</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(var e in expenses.Items)
+                {
+                    <tr>
+                        <td>@e.Title</td>
+                        <td>@e.Amount</td>
+                        <td>@e.Currency</td>
+                        <td>@e.Category</td>
+                        <td>@e.OccurredOn</td>
+                        <td><span class="badge bg-@Badge(e.Status)">@e.Status</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="d-flex align-items-center gap-2">
+
+            <button class="btn btn-sm btn-secondary" disabled="@(page <= 1)" @onclick="Prev">Prev</button>
+            @* <span class="small text-muted">Page @page of @TotalPages(expenses.TotalCount total)</span> *@
+            <button class="btn btn-sm btn-secondary"
+                    disabled="@(page >= TotalPages)"
+                    @onclick="Next">Next</button>
+        </div>
+    }
+}
+
+@code {
+    private PagedResult<ExpenseDto>? expenses;
+    private int pageSize = 10;
+
+    private int TotalPages => expenses is null ? 1 : (int)Math.Ceiling(expenses.TotalCount / (double)pageSize);
+    string statusFilter = "";
+    int page = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        if (Auth.IsApprover)
+        {
+            NavigationManager.NavigateTo("/expense/actions");
+            return;
+        }
+
+        await Reload();
+    }
+
+    async Task Reload()
+    {
+        page = 1;
+        expenses = await ExpenseService.GetPagedResultAsync(statusFilter is "" ? null : statusFilter, page, pageSize);
+    }
+    async Task Load()
+    {
+        expenses = await ExpenseService.GetPagedResultAsync(statusFilter is "" ? null : statusFilter, page, pageSize);
+    }
+    async Task Prev() { page--; await Load(); }
+    async Task Next() { page++; await Load(); }
+
+    static string Badge(string s)
+    {
+        switch (s)
+        {
+            case "Approved":
+                return "success";
+            case "Rejected":
+                return "danger";
+            default:
+                return "secondary";
+        }
+    }
+}

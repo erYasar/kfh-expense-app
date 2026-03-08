@@ -1,0 +1,128 @@
+@page "/expense/create"
+@using kfh_expense_app.Services
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IExpenseService ExpenseService
+@inject AuthSessionService Auth
+@inject NavigationManager NavigationManager
+
+@if (!Auth.IsAuthenticated)
+{
+    <p>Redirecting...</p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">New Expense</h4>
+        <a class="btn btn-sm btn-secondary" href="/expenses">Back</a>
+    </div>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="row">
+        <div class="col-md-5">
+            <EditForm Model="model" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label class="form-label">Title</label>
+                    <InputText class="form-control" @bind-Value="model.Title" maxlength="20" />
+                    <ValidationMessage For="() => model.Title" class="text-danger small" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Amount</label>
+                    <InputNumber class="form-control" @bind-Value="model.Amount" />
+                    <ValidationMessage For="() => model.Amount" class="text-danger small" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Currency</label>
+                    <InputSelect class="form-select" @bind-Value="model.Currency">
+                        <option value="">-- Select --</option>
+                        <option value="KWD">KWD</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                    </InputSelect>
+                    <ValidationMessage For="() => model.Currency" class="text-danger small" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Category</label>
+                    <InputSelect class="form-select" @bind-Value="model.Category">
+                        <option value="">-- Select --</option>
+                        <option value="Travel">Travel</option>
+                        <option value="Meals">Meals</option>
+                        <option value="Accommodation">Accommodation</option>
+                        <option value="Office Supplies">Office Supplies</option>
+                        <option value="Training">Training</option>
+                        <option value="Other">Other</option>
+                    </InputSelect>
+                    <ValidationMessage For="() => model.Category" class="text-danger small" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Date</label>
+                    <InputDate class="form-control" @bind-Value="model.OccurredOn" />
+                    <ValidationMessage For="() => model.OccurredOn" class="text-danger small" />
+                </div>
+
+                <button type="submit" class="btn btn-primary" disabled="@saving">
+                    @(saving ? "Saving..." : "Submit")
+                </button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    private FormModel model = new() { OccurredOn = DateOnly.FromDateTime(DateTime.Today) };
+    private bool saving;
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        if (!Auth.IsAuthenticated)
+            NavigationManager.NavigateTo("/login");
+    }
+
+    async Task HandleSubmit()
+    {
+        saving = true;
+        errorMessage = null;
+
+        try
+        {
+            var dto = new ExpenseDto(0, model.Title, model.Amount, model.Currency,
+                model.Category, model.OccurredOn, "Pending", null!, default, Guid.Empty);
+
+            await ExpenseService.CreateAsync(dto);
+            NavigationManager.NavigateTo("/expenses");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            saving = false;
+        }
+    }
+
+    class FormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.MaxLength(20)]
+        public string Title { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Range(0.01, double.MaxValue, ErrorMessage = "Amount must be greater than 0")]
+        public decimal Amount { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Currency { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Category { get; set; } = "";
+
+        public DateOnly OccurredOn { get; set; }
+    }
+}

@@ -9,4 +9,16 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="Application\" />
+    <Folder Include="API\" />
+    <Folder Include="Client\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.3" />
+  </ItemGroup>
+
 </Project>

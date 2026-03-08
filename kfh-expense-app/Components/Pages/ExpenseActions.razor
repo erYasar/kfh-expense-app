@@ -1,0 +1,132 @@
+@page "/expense/actions"
+@using kfh_expense_app.Services
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IExpenseService ExpenseService
+@inject AuthSessionService Auth
+@inject NavigationManager NavigationManager
+
+@if (!Auth.IsAuthenticated || !Auth.IsApprover)
+{
+    <p>Redirecting...</p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Pending Approvals</h4>
+    </div>
+
+    @if (expenses is null)
+    {
+        <p class="text-muted">Loading...</p>
+    }
+    else if (!expenses.Items.Any())
+    {
+        <p class="text-muted">No pending expenses.</p>
+    }
+    else
+    {
+        <table class="table table-striped table-hover table-sm align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Title</th>
+                    <th>Amount</th>
+                    <th>Currency</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                    <th>Submitted By</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in expenses.Items)
+                {
+                    <tr>
+                        <td>@e.Title</td>
+                        <td>@e.Amount</td>
+                        <td>@e.Currency</td>
+                        <td>@e.Category</td>
+                        <td>@e.OccurredOn</td>
+                        <td>@e.CreatedByUserId</td>
+                        <td>
+                            <button class="btn btn-success btn-sm me-1"
+                                    disabled="@IsProcessing(e.Id)"
+                                    @onclick="() => Approve(e.Id)">
+                                Approve
+                            </button>
+                            <button class="btn btn-danger btn-sm"
+                                    disabled="@IsProcessing(e.Id)"
+                                    @onclick="() => Reject(e.Id)">
+                                Reject
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-secondary" disabled="@(page <= 1)" @onclick="Prev">Prev</button>
+            <button class="btn btn-sm btn-secondary" disabled="@(page >= TotalPages)" @onclick="Next">Next</button>
+        </div>
+    }
+
+    @if (feedback is not null)
+    {
+        <div class="alert alert-@feedbackType mt-3 py-2">@feedback</div>
+    }
+}
+
+@code {
+    private PagedResult<ExpenseDto>? expenses;
+    private readonly HashSet<int> processing = new();
+    private string? feedback;
+    private string feedbackType = "success";
+    private int page = 1;
+    private const int PageSize = 10;
+
+    private int TotalPages => expenses is null ? 1 : (int)Math.Ceiling(expenses.TotalCount / (double)PageSize);
+    private bool IsProcessing(int id) => processing.Contains(id);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated || !Auth.IsApprover)
+        {
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        await Load();
+    }
+
+    async Task Load()
+    {
+        expenses = await ExpenseService.GetPagedResultAsync("Pending", page, PageSize);
+    }
+
+    async Task Approve(int id)
+    {
+        processing.Add(id);
+        var ok = await ExpenseService.ApproveAsync(id);
+        processing.Remove(id);
+        ShowFeedback(ok, "Approved successfully.", "Failed to approve.");
+        if (ok) await Load();
+    }
+
+    async Task Reject(int id)
+    {
+        processing.Add(id);
+        var ok = await ExpenseService.RejectAsync(id);
+        processing.Remove(id);
+        ShowFeedback(ok, "Rejected successfully.", "Failed to reject.");
+        if (ok) await Load();
+    }
+
+    void ShowFeedback(bool ok, string success, string failure)
+    {
+        feedbackType = ok ? "success" : "danger";
+        feedback = ok ? success : failure;
+    }
+
+    async Task Prev() { page--; await Load(); }
+    async Task Next() { page++; await Load(); }
+}

@@ -1,0 +1,95 @@
+﻿@page "/login"
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using kfh_expense_app.Services
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject AuthSessionService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Login</PageTitle>
+<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
+    <div class="card shadow" style=" width:380px">
+        <div class="card-header bg-dark text-white text-center py-3">
+            <h5 class="mg-0">Expense</h5>
+        </div>
+        <div class="card-body p-4">
+            <h6 class="text-muted text-center mb-4">Sign In</h6>
+
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <div class="alert alert-danger py-2 small">@error</div>
+            }
+
+            <EditForm Model="model" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Username</label>
+                    <InputText class="form-control" @bind-Value="model.Username"></InputText>
+                    <ValidationMessage For="() => model.Username" class="text-danger small"></ValidationMessage>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Password</label>
+                    <div class="input-group">
+                        <input type="@(showPwd ? "text" : "password")"
+                               class="form-control"
+                               @bind="model.Password"
+                               @bind:event="oninput" />
+                               <button type="button" class="btn btn-outline-secondary"
+                               @onclick="()=> showPwd=!showPwd" tabindex="-1">
+                           @(showPwd?"Hide":"Show")
+                           </button>
+                    </div>
+                    <ValidationMessage For="() => model.Password" class="text-danger small"></ValidationMessage>
+
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100" disabled="@loading">
+                    @if (loading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>Signing in...</span>
+                    }
+                    else
+                    {
+                        <span>Login</span>
+                    }
+                </button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel model = new();
+    string error = string.Empty;
+    bool loading, showPwd=false;
+
+    protected override void OnInitialized()
+    {
+        if (Auth.IsAuthenticated) Nav.NavigateTo("/expenses");
+    }
+
+    async Task HandleLogin()
+    {
+        loading = true;
+        error = string.Empty;
+
+        var encoded = Convert.ToBase64String(
+            Encoding.UTF8.GetBytes($"{model.Username}:{model.Password}")
+        );
+
+        var (ok, err) = await Auth.LoginAsync($"Basic {encoded}");
+        if (ok) Nav.NavigateTo(Auth.IsApprover ? "/expense/actions" : "/expenses");
+        else error = err ?? "Login failed";
+        loading = false;
+    }
+
+    private class LoginModel
+    {
+        [Required(ErrorMessage = "Username is required")]
+        public string Username { get; set; }
+        [Required(ErrorMessage = "Password is required")]
+        public string Password { get; set; }
+    }
+
+}

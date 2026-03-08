@@ -1,23 +1,45 @@
-﻿@inherits LayoutComponentBase
+﻿@using kfh_expense_app.Services
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthSessionService AuthSessionService
+@inject NavigationManager NavigationManager
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
+<nav class="navbar navbar-dark-bg bg-dark px-4">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/expenses">Expense App</a>
+
+        @if (AuthSessionService.IsAuthenticated)
+        {
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-light">Hello, @AuthSessionService.Username!</span>
+                <button class="btn btn-sm btn-outline-light" @onclick="Logout">Logout</button>
+            </div>
+        }
     </div>
+</nav>
+<main class="content px-4">
+    @Body
+</main>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+@code {
+    protected override void OnInitialized()
+    {
+        AuthSessionService.OnChange += OnAuthChanged;
+    }
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+    void OnAuthChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
+    void Logout()
+    {
+        AuthSessionService.Logout();
+        NavigationManager.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        AuthSessionService.OnChange -= OnAuthChanged;
+    }
+}
